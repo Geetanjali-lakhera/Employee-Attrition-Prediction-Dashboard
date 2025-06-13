@@ -3,7 +3,7 @@ pandas
 numpy
 matplotlib
 scikit-learn
-imblearn
+imbalanced-learn
 plotly
 seaborn
 xgboost

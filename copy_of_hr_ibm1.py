@@ -33,6 +33,11 @@ features = [
     'JobInvolvement', 'BusinessTravel', 'Department', 'EducationField',
     'Education', 'StockOptionLevel', 'TrainingTimesLastYear'
 ]
+
+# Define categorical columns (to exclude from SMOTE)
+categorical_cols = ['OverTime', 'JobRole', 'BusinessTravel', 'Department', 'EducationField']
+
+# Feature matrix and target
 X = df[features]
 y = df['Attrition']
 
@@ -55,12 +60,18 @@ print("Accuracy:", round(accuracy_score(y_test, y_pred_before) * 100, 2), "%")
 print("Classification Report:\n", classification_report(y_test, y_pred_before))
 print("ROC AUC Score:", roc_auc_score(y_test, model_before.predict_proba(X_test)[:, 1]))
 
-# Apply SMOTE
+# Apply SMOTE on numeric-only features
+X_train_smote = X_train.drop(columns=categorical_cols)
 smote = SMOTE(random_state=42)
-X_train_bal, y_train_bal = smote.fit_resample(X_train, y_train)
+X_train_bal_numeric, y_train_bal = smote.fit_resample(X_train_smote, y_train)
+
+# Join back categorical features (from original X_train)
+X_train_categoricals = X_train[categorical_cols].reset_index(drop=True)
+X_train_bal = pd.concat([X_train_bal_numeric.reset_index(drop=True), X_train_categoricals.loc[X_train_bal_numeric.index]], axis=1)
+
 print(f"\n✅ Applied SMOTE. Balanced classes: {y_train_bal.value_counts().to_dict()}")
 
-# Train final model with SMOTE-applied data
+# Train final model with SMOTE-applied data (all features)
 model = xgb.XGBClassifier(
     n_estimators=250,
     learning_rate=0.08,
@@ -102,4 +113,4 @@ plt.show()
 with open('xgb_attrition_model_v2.pkl', 'wb') as f:
     pickle.dump(model, f)
 
-print("✅ Final model (SMOTE-trained) saved as 'xgb_attrition_model_v2.pkl'")
+print("Final model (SMOTE-trained) saved as 'xgb_attrition_model_v2.pkl'")

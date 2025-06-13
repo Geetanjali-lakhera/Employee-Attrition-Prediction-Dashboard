@@ -34,17 +34,17 @@ features = [
     'Education', 'StockOptionLevel', 'TrainingTimesLastYear'
 ]
 
-# Define categorical columns (to exclude from SMOTE)
+# Define categorical columns (to exclude for SMOTE)
 categorical_cols = ['OverTime', 'JobRole', 'BusinessTravel', 'Department', 'EducationField']
 
 # Feature matrix and target
 X = df[features]
 y = df['Attrition']
 
-# Split into train-test
+# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
-# Model before SMOTE (for comparison)
+# Model before SMOTE
 model_before = xgb.XGBClassifier(
     n_estimators=200,
     learning_rate=0.1,
@@ -60,18 +60,28 @@ print("Accuracy:", round(accuracy_score(y_test, y_pred_before) * 100, 2), "%")
 print("Classification Report:\n", classification_report(y_test, y_pred_before))
 print("ROC AUC Score:", roc_auc_score(y_test, model_before.predict_proba(X_test)[:, 1]))
 
-# Apply SMOTE on numeric-only features
-X_train_smote = X_train.drop(columns=categorical_cols)
-smote = SMOTE(random_state=42)
-X_train_bal_numeric, y_train_bal = smote.fit_resample(X_train_smote, y_train)
+# ===== SMOTE FIX =====
 
-# Join back categorical features (from original X_train)
+# Drop categorical cols before SMOTE
+X_train_smote = X_train.drop(columns=categorical_cols)
+X_train_smote = X_train_smote.select_dtypes(include='number')
+X_train_smote.reset_index(drop=True, inplace=True)
+y_train_smote = y_train.reset_index(drop=True)
+
+# Apply SMOTE on numeric features only
+smote = SMOTE(random_state=42)
+X_train_bal_numeric, y_train_bal = smote.fit_resample(X_train_smote, y_train_smote)
+
+# Add back the original categorical features after resampling
 X_train_categoricals = X_train[categorical_cols].reset_index(drop=True)
-X_train_bal = pd.concat([X_train_bal_numeric.reset_index(drop=True), X_train_categoricals.loc[X_train_bal_numeric.index]], axis=1)
+X_train_bal = pd.concat([
+    X_train_bal_numeric,
+    X_train_categoricals.loc[X_train_bal_numeric.index].reset_index(drop=True)
+], axis=1)
 
 print(f"\n✅ Applied SMOTE. Balanced classes: {y_train_bal.value_counts().to_dict()}")
 
-# Train final model with SMOTE-applied data (all features)
+# Final model training
 model = xgb.XGBClassifier(
     n_estimators=250,
     learning_rate=0.08,
@@ -84,12 +94,12 @@ model = xgb.XGBClassifier(
 )
 model.fit(X_train_bal, y_train_bal)
 
-# Predict using custom threshold for better recall
+# Predictions
 y_proba = model.predict_proba(X_test)[:, 1]
 threshold = 0.30
 y_pred = (y_proba >= threshold).astype(int)
 
-# Evaluate model
+# Evaluation
 print("\n📈 AFTER SMOTE (Final Model):")
 print("🔎 Accuracy:", round(accuracy_score(y_test, y_pred) * 100, 2), "%")
 print("🔎 Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
@@ -102,7 +112,7 @@ importance_df = pd.DataFrame({
     'Importance': model.feature_importances_
 }).sort_values(by='Importance', ascending=False)
 
-# Plot top features
+# Plot
 plt.figure(figsize=(12, 6))
 sns.barplot(data=importance_df.head(15), x='Importance', y='Feature', palette='viridis')
 plt.title('Top 15 Features Influencing Attrition')
@@ -113,4 +123,4 @@ plt.show()
 with open('xgb_attrition_model_v2.pkl', 'wb') as f:
     pickle.dump(model, f)
 
-print("Final model (SMOTE-trained) saved as 'xgb_attrition_model_v2.pkl'")
+print("✅ Final model (SMOTE-trained) saved as 'xgb_attrition_model_v2.pkl'")

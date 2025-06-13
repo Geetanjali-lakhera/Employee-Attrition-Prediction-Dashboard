@@ -34,17 +34,17 @@ features = [
     'Education', 'StockOptionLevel', 'TrainingTimesLastYear'
 ]
 
-# Define categorical columns (to exclude for SMOTE)
+# Define categorical columns
 categorical_cols = ['OverTime', 'JobRole', 'BusinessTravel', 'Department', 'EducationField']
 
-# Feature matrix and target
+# Split features and target
 X = df[features]
 y = df['Attrition']
 
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
-# Model before SMOTE
+# ----- BEFORE SMOTE MODEL -----
 model_before = xgb.XGBClassifier(
     n_estimators=200,
     learning_rate=0.1,
@@ -60,19 +60,24 @@ print("Accuracy:", round(accuracy_score(y_test, y_pred_before) * 100, 2), "%")
 print("Classification Report:\n", classification_report(y_test, y_pred_before))
 print("ROC AUC Score:", roc_auc_score(y_test, model_before.predict_proba(X_test)[:, 1]))
 
-# ===== SMOTE FIX =====
+# ====== SMOTE SECTION FIXED ======
 
 # Drop categorical cols before SMOTE
-X_train_smote = X_train.drop(columns=categorical_cols)
-X_train_smote = X_train_smote.select_dtypes(include='number')
+X_train_smote = X_train.drop(columns=categorical_cols).copy()
+
+# Convert all to numeric and fill NaN if any
+X_train_smote = X_train_smote.apply(pd.to_numeric, errors='coerce')
+X_train_smote = X_train_smote.fillna(0)
+
+# Reset index
 X_train_smote.reset_index(drop=True, inplace=True)
 y_train_smote = y_train.reset_index(drop=True)
 
-# Apply SMOTE on numeric features only
+# Apply SMOTE
 smote = SMOTE(random_state=42)
 X_train_bal_numeric, y_train_bal = smote.fit_resample(X_train_smote, y_train_smote)
 
-# Add back the original categorical features after resampling
+# Add back categorical columns
 X_train_categoricals = X_train[categorical_cols].reset_index(drop=True)
 X_train_bal = pd.concat([
     X_train_bal_numeric,
@@ -81,7 +86,7 @@ X_train_bal = pd.concat([
 
 print(f"\n✅ Applied SMOTE. Balanced classes: {y_train_bal.value_counts().to_dict()}")
 
-# Final model training
+# ----- FINAL MODEL -----
 model = xgb.XGBClassifier(
     n_estimators=250,
     learning_rate=0.08,
@@ -94,7 +99,7 @@ model = xgb.XGBClassifier(
 )
 model.fit(X_train_bal, y_train_bal)
 
-# Predictions
+# Predict
 y_proba = model.predict_proba(X_test)[:, 1]
 threshold = 0.30
 y_pred = (y_proba >= threshold).astype(int)

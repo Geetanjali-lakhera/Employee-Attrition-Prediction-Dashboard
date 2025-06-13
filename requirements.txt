@@ -5,3 +5,5 @@ matplotlib
 scikit-learn
 imblearn
 plotly
+seaborn
+xgboost

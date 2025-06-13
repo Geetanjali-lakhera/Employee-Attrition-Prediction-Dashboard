@@ -9,7 +9,7 @@ import xgboost as xgb
 import pickle
 
 # Load dataset
-df = pd.read_csv("WA_Fn-UseC_-HR-Employee-Attrition.csv')
+df = pd.read_csv('WA_Fn-UseC_-HR-Employee-Attrition.csv')
 
 # Drop unused columns
 df.drop(['EmployeeNumber', 'EmployeeCount', 'Over18', 'StandardHours'], axis=1, inplace=True)
